@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  username    String    @unique
+  email       String    @unique
+  password    String
+  avatar_url  String?
+  created_at  DateTime  @default(now())
+  last_login_at DateTime?
+
+  messages    Message[]
+  serverMemberships ServerMember[]
+  ownedServers   Server[] @relation("UserServers")
+
+  friends     Friendship[] @relation("UserFriends")
+  friendOf    Friendship[] @relation("FriendUsers")
+
+
+  sentInvites     FriendInvite[] @relation("SentInvites")
+  receivedInvites FriendInvite[] @relation("ReceivedInvites")
+
+  sentDirectMessages     DirectMessage[] @relation("SentDirectMessages")
+  receivedDirectMessages DirectMessage[] @relation("ReceivedDirectMessages")
+}
+
+model Friendship {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  friendId   Int
+  created_at DateTime @default(now())
+
+  user       User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend     User     @relation("FriendUsers", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+}
+
+model FriendInvite {
+  id         Int       @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  status     InviteStatus @default(PENDING) 
+  created_at DateTime   @default(now())
+
+  sender     User       @relation("SentInvites", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User       @relation("ReceivedInvites", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId]) 
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+
+model Server {
+  id          Int       @id @default(autoincrement())
+  server_name String
+  image_url    String?
+  user_id     Int
+  created_at  DateTime  @default(now())
+
+  owner       User          @relation("UserServers", fields: [user_id], references: [id], onDelete: Cascade)
+  channels    Channel[]
+  members     ServerMember[]
+}
+
+model Channel {
+  id           Int      @id @default(autoincrement())
+  channel_name String
+  type         ChannelType
+  server_id    Int
+  created_at   DateTime @default(now())
+
+  server       Server        @relation(fields: [server_id], references: [id], onDelete: Cascade)
+  messages     Message[]
+}
+
+model DirectMessage {
+  id              Int             @id @default(autoincrement())
+  created_at      DateTime        @default(now())
+  sender_id       Int
+  receiver_id     Int
+  
+  sender          User            @relation("SentDirectMessages", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver        User            @relation("ReceivedDirectMessages", fields: [receiver_id], references: [id], onDelete: Cascade)
+  messages        Message[]       @relation("DirectMessages")
+}
+
+model Message {
+  id         Int       @id @default(autoincrement())
+  content    String
+  iv         String
+  edited_at  DateTime?
+  channel_id Int?
+  user_id    Int
+  created_at DateTime  @default(now())
+  direct_message_id Int?          
+
+  channel    Channel?   @relation(fields: [channel_id], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  directMessage   DirectMessage?  @relation("DirectMessages", fields: [direct_message_id], references: [id], onDelete: Cascade)
+}
+
+model ServerMember {
+  id        Int       @id @default(autoincrement())
+  server_id Int
+  user_id   Int
+  joined_at DateTime  @default(now())
+
+  server    Server    @relation(fields: [server_id], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [user_id], references: [id])
+
+  @@unique([server_id, user_id])
+}
+
+enum ChannelType {
+  TEXT
+  VOICE
+}
